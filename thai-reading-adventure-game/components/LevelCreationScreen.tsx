@@ -4,8 +4,8 @@ import { World, Level } from '../types';
 import Button from './Button';
 
 interface LevelCreationScreenProps {
-  worlds: World[]; 
-  currentSelectedWorldId?: string; 
+  worlds: World[];
+  currentSelectedWorldId?: string;
   onAddLevel: (newLevel: Level, worldId: string) => void;
   onBack: () => void;
   allWorldsData: World[];
@@ -24,12 +24,14 @@ const LevelCreationScreen: React.FC<LevelCreationScreenProps> = ({
   const [question, setQuestion] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [correctAnswer, setCorrectAnswer] = useState('');
-  const [distractorOptions, setDistractorOptions] = useState<string[]>([]);
+  const [distractor1, setDistractor1] = useState('');
+  const [distractor2, setDistractor2] = useState('');
   const [finalOptions, setFinalOptions] = useState<string[]>([]);
 
-  const generateDistractors = useCallback(() => {
+  const generateAndSetDistractors = useCallback(() => {
     if (!correctAnswer.trim()) {
-      setDistractorOptions([]);
+      setDistractor1('');
+      setDistractor2('');
       return;
     }
 
@@ -43,43 +45,46 @@ const LevelCreationScreen: React.FC<LevelCreationScreenProps> = ({
       });
     });
 
-    // Get unique answers only
     const uniqueAnswers = Array.from(new Set(allPossibleAnswers));
     const shuffled = uniqueAnswers.sort(() => 0.5 - Math.random());
-    
-    // Aim for 2 distractors, but take fewer if not enough unique options are available
-    setDistractorOptions(shuffled.slice(0, 2)); 
+
+    setDistractor1(shuffled[0] || '');
+    setDistractor2(shuffled[1] || '');
   }, [correctAnswer, allWorldsData]);
 
+  // Auto-populate distractors when correct answer changes (and is not empty)
   useEffect(() => {
-    // Re-generate distractors when the correct answer changes
-    generateDistractors();
-  }, [correctAnswer, generateDistractors]);
+    if (correctAnswer.trim()) {
+      generateAndSetDistractors();
+    } else {
+      // Clear distractors if correct answer is cleared
+      setDistractor1('');
+      setDistractor2('');
+    }
+  }, [correctAnswer, generateAndSetDistractors]);
 
+  // Update final options whenever correct answer or distractors change
   useEffect(() => {
-    // Update final options whenever correct answer or distractors change
     if (correctAnswer.trim()) {
       const optionsSet = new Set<string>();
       optionsSet.add(correctAnswer.trim());
-      distractorOptions.forEach(opt => optionsSet.add(opt));
+      if (distractor1.trim()) optionsSet.add(distractor1.trim());
+      if (distractor2.trim()) optionsSet.add(distractor2.trim());
       
-      // Shuffle the final unique options
       setFinalOptions(Array.from(optionsSet).sort(() => 0.5 - Math.random()));
     } else {
       setFinalOptions([]);
     }
-  }, [correctAnswer, distractorOptions]);
+  }, [correctAnswer, distractor1, distractor2]);
 
-  // Effect to update local selectedWorldIdState if currentSelectedWorldId prop changes (e.g., re-navigating)
   useEffect(() => {
     if (currentSelectedWorldId) {
       setSelectedWorldIdState(currentSelectedWorldId);
     } else if (worlds && worlds.length > 0 && !currentSelectedWorldId) {
-       // If global creation and no specific world, default to first available, or ensure it's settable
        if (!worlds.find(w => w.id === selectedWorldIdState) && worlds.length > 0) {
            setSelectedWorldIdState(worlds[0].id);
        } else if (worlds.length === 0) {
-           setSelectedWorldIdState(''); // No worlds to select
+           setSelectedWorldIdState('');
        }
     }
   }, [currentSelectedWorldId, worlds, selectedWorldIdState]);
@@ -88,7 +93,7 @@ const LevelCreationScreen: React.FC<LevelCreationScreenProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWorldIdState || !question.trim() || !correctAnswer.trim() || finalOptions.length < 2) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน: เลือกดินแดน, คำถาม, คำตอบที่ถูกต้อง และต้องมีตัวเลือกอย่างน้อย 2 ตัวเลือก (รวมคำตอบที่ถูกต้อง)');
+      alert('กรุณากรอกข้อมูลให้ครบถ้วน: เลือกดินแดน, คำถาม, คำตอบที่ถูกต้อง และต้องมีตัวเลือกอย่างน้อย 2 ตัวเลือก (รวมคำตอบที่ถูกต้องและตัวเลือกหลอกอย่างน้อยหนึ่งตัว)');
       return;
     }
     if (worlds.length === 0 && !currentSelectedWorldId) {
@@ -96,20 +101,17 @@ const LevelCreationScreen: React.FC<LevelCreationScreenProps> = ({
         return;
     }
 
-
     const newLevel: Level = {
-      type: imageUrl.trim() ? 'match_image_word' : 'sentence_completion', // Basic type assignment
+      type: imageUrl.trim() ? 'match_image_word' : 'sentence_completion',
       question: question.trim(),
       image: imageUrl.trim() || undefined,
       options: finalOptions,
       answer: correctAnswer.trim(),
     };
     onAddLevel(newLevel, selectedWorldIdState);
-    // Reset form fields after submission
     setQuestion('');
     setImageUrl('');
-    setCorrectAnswer('');
-    // setSelectedWorldIdState will be handled by navigation or remain for next entry
+    setCorrectAnswer(''); // This will also clear distractors due to useEffect
   };
 
   const inputClass = "w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#4facfe] focus:border-[#4facfe] outline-none transition-colors";
@@ -139,7 +141,7 @@ const LevelCreationScreen: React.FC<LevelCreationScreenProps> = ({
             value={selectedWorldIdState}
             onChange={(e) => setSelectedWorldIdState(e.target.value)}
             className={inputClass}
-            disabled={!!currentSelectedWorldId || worlds.length === 0} 
+            disabled={!!currentSelectedWorldId || worlds.length === 0}
             required
           >
             {worlds.length === 0 && <option value="">-- ไม่มีดินแดน --</option>}
@@ -189,35 +191,60 @@ const LevelCreationScreen: React.FC<LevelCreationScreenProps> = ({
         </div>
 
         {correctAnswer.trim() && (
-          <div>
-            <div className="flex items-center mb-1">
-                <h3 className={labelClass}>ตัวเลือก (อัตโนมัติ):</h3>
-                <button 
-                    type="button" 
-                    onClick={generateDistractors} 
-                    className="ml-2 text-sm text-[#4facfe] hover:text-[#007bff] p-1 rounded-full hover:bg-blue-100"
+          <div className="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+            <div className="flex items-center justify-between">
+                <h3 className={`${labelClass} mb-0`}>ตัวเลือกหลอก:</h3>
+                <button
+                    type="button"
+                    onClick={generateAndSetDistractors}
+                    className="text-sm text-[#4facfe] hover:text-[#007bff] p-1 rounded-full hover:bg-blue-100 flex items-center gap-1"
                     aria-label="สุ่มตัวเลือกหลอกใหม่"
                 >
                     <i className="fas fa-sync-alt"></i> สุ่มใหม่
                 </button>
             </div>
-            {finalOptions.length > 0 ? (
-              <ul className="list-disc list-inside bg-gray-50 p-3 rounded-md">
-                {finalOptions.map((opt, index) => (
-                  <li key={index} className="text-gray-700">{opt} {opt === correctAnswer.trim() && <span className="text-xs text-green-600">(คำตอบที่ถูกต้อง)</span>}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-xs text-gray-500">กรอกคำตอบที่ถูกต้องเพื่อสร้างตัวเลือก</p>
-            )}
-            <p className="text-xs text-gray-500 mt-1">
-              ตัวเลือกหลอกจะถูกสร้างจากคำตอบของด่านอื่นๆ (ถ้ามี). จะมีตัวเลือกอย่างน้อย 2 ตัวเลือกเสมอ (รวมคำตอบที่ถูกต้อง)
+            <div>
+              <label htmlFor="distractor1" className={`${labelClass} text-xs`}>ตัวเลือกหลอก 1:</label>
+              <input
+                type="text"
+                id="distractor1"
+                value={distractor1}
+                onChange={(e) => setDistractor1(e.target.value)}
+                className={`${inputClass} p-2 text-sm`}
+                placeholder="กรอกตัวเลือกหลอก หรือปล่อยให้สุ่ม"
+              />
+            </div>
+            <div>
+              <label htmlFor="distractor2" className={`${labelClass} text-xs`}>ตัวเลือกหลอก 2:</label>
+              <input
+                type="text"
+                id="distractor2"
+                value={distractor2}
+                onChange={(e) => setDistractor2(e.target.value)}
+                className={`${inputClass} p-2 text-sm`}
+                placeholder="กรอกตัวเลือกหลอก หรือปล่อยให้สุ่ม"
+              />
+            </div>
+             <p className="text-xs text-gray-500 mt-1">
+              ตัวเลือกหลอกจะถูกเติมอัตโนมัติจากคำตอบของด่านอื่นๆ (ถ้ามี) คุณสามารถแก้ไขได้ตามต้องการ
             </p>
           </div>
         )}
         
-        <div className="flex flex-col sm:flex-row gap-4 mt-8">
-          <Button type="submit" variant="secondary" iconClass="fas fa-save" className="w-full sm:w-auto" disabled={worlds.length === 0 && !currentSelectedWorldId}>
+        {finalOptions.length > 0 && (
+            <div>
+                <h3 className={`${labelClass} mt-2`}>ตัวเลือกสุดท้าย (ที่จะแสดงในเกม, สลับลำดับแล้ว):</h3>
+                 <ul className="list-disc list-inside bg-white p-3 rounded-md border border-gray-200">
+                    {finalOptions.map((opt, index) => (
+                    <li key={index} className="text-gray-700">{opt} {opt === correctAnswer.trim() && <span className="text-xs text-green-600 font-semibold">(คำตอบที่ถูกต้อง)</span>}</li>
+                    ))}
+                </ul>
+                {finalOptions.length < 2 && <p className="text-xs text-red-500 mt-1">คำเตือน: ต้องมีตัวเลือกอย่างน้อย 2 ตัวเลือก (คำตอบที่ถูกต้อง และอย่างน้อยหนึ่งตัวเลือกหลอกที่แตกต่าง)</p>}
+            </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-4 mt-8 pt-4 border-t">
+          <Button type="submit" variant="secondary" iconClass="fas fa-save" className="w-full sm:w-auto" disabled={(worlds.length === 0 && !currentSelectedWorldId) || finalOptions.length < 2}>
             บันทึกด่าน
           </Button>
           <Button onClick={onBack} variant="primary" iconClass="fas fa-times-circle" className="w-full sm:w-auto">
