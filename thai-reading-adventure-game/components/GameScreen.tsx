@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Level } from '../types';
 import Button from './Button';
-import { speak } from '../utils/speech'; // Import the TTS utility
+// Removed: import { speak } from '../utils/speech'; 
 
 interface GameScreenProps {
   level: Level;
@@ -95,13 +95,15 @@ const GameScreen: React.FC<GameScreenProps> = ({ level, onAnswer, onBack }) => {
         <p className="text-[1.4rem] md:text-[1.6rem] mb-1 text-[#073b4c] leading-normal inline">
           {level.question}
         </p>
+        {/* Removed TTS button for question
         <button 
           onClick={() => speak(level.question)} 
           className="text-xl text-[#4facfe] hover:text-[#007bff] ml-2 align-middle" 
           aria-label="อ่านคำถาม"
         >
           <i className="fas fa-volume-up"></i>
-        </button>
+        </button> 
+        */}
       </div>
       
       {showHintButton && (
@@ -144,6 +146,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ level, onAnswer, onBack }) => {
               onKeyPress={!isAnswered && !isHintDisabled ? (e) => e.key === 'Enter' && handleOptionClick(optionText) : undefined}
             >
               {optionText}
+              {/* Removed TTS button for options
               {!isHintDisabled && (
                 <button 
                   onClick={(e) => { 
@@ -156,6 +159,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ level, onAnswer, onBack }) => {
                   <i className="fas fa-volume-up"></i>
                 </button>
               )}
+              */}
             </div>
           );
         })}
